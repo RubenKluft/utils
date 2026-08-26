@@ -7,6 +7,7 @@ use DR\Utils\Arrays;
 use PhpParser\Node\Expr\StaticCall;
 use PHPStan\Analyser\Scope;
 use PHPStan\Reflection\MethodReflection;
+use PHPStan\Type\Accessory\AccessoryArrayListType;
 use PHPStan\Type\ArrayType;
 use PHPStan\Type\Constant\ConstantArrayType;
 use PHPStan\Type\Constant\ConstantIntegerType;
@@ -15,6 +16,7 @@ use PHPStan\Type\IntegerType;
 use PHPStan\Type\Type;
 use PHPStan\Type\TypeCombinator;
 use PHPStan\Type\UnionType;
+use PHPStan\TrinaryLogic;
 
 /**
  * Resolves the precise item type for {@see Arrays::flatten()}, which cannot be expressed with a native
@@ -39,28 +41,70 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
     {
         [$items] = $methodCall->getArgs();
 
+        // guard against argument unpacking (e.g. `Arrays::flatten(...$data)`), whose value type describes the
+        // spread expression itself rather than the single `array $array` parameter
+        if ($items->unpack) {
+            return $methodReflection->getVariants()[0]->getReturnType();
+        }
+
         $inputType = $scope->getType($items->value);
-        // `list<T>` is represented as an intersection of `array<int, T>` and an accessory list type, so unwrap it here.
-        $arrayType = $inputType->getArrays()[0] ?? null;
+
+        // `flatten()`'s native `array` parameter already guarantees an array-like type, so unwrap every shape it
+        // could be (e.g. each union member, and `list<T>`, which PHPStan represents as an intersection of
+        // `array<int, T>` and an accessory list type)
+        /** @var array<ArrayType|ConstantArrayType> $arrayTypes */
+        $arrayTypes = $inputType->getArrays();
         // @codeCoverageIgnoreStart
-        if ($arrayType instanceof ArrayType === false && $arrayType instanceof ConstantArrayType === false) {
+        if ($arrayTypes === []) {
             return $inputType;
         }
         // @codeCoverageIgnoreEnd
 
+        $resultTypes = array_map($this->flattenArrayType(...), $arrayTypes);
+
+        return count($resultTypes) === 1 ? $resultTypes[0] : TypeCombinator::union(...$resultTypes);
+    }
+
+    /**
+     * Resolves the underlying array type(s) (in case of a union) for the given type, or null when the type isn't
+     * guaranteed to be an array (e.g. a union that also contains non-array members).
+     *
+     * @return array<ArrayType|ConstantArrayType>|null
+     */
+    private function resolveArrays(Type $type): ?array
+    {
+        if ($type->isArray()->yes() === false) {
+            return null;
+        }
+
+        /** @var array<ArrayType|ConstantArrayType> $arrays */
+        $arrays = $type->getArrays();
+
+        return $arrays;
+    }
+
+    /**
+     * Flattens a single array shape into its resulting {@see Arrays::flatten()} return type.
+     */
+    private function flattenArrayType(ArrayType|ConstantArrayType $arrayType): Type
+    {
         $leafTypes = $this->collectLeafTypes($arrayType);
 
         // literal arrays are flattened into an exact tuple, preserving each leaf's precise type
         if ($arrayType instanceof ConstantArrayType) {
             return new ConstantArrayType(
                 array_map(static fn (int $index): ConstantIntegerType => new ConstantIntegerType($index), array_keys($leafTypes)),
-                array_values($leafTypes)
+                array_values($leafTypes),
+                [count($leafTypes)],
+                [],
+                TrinaryLogic::createYes()
             );
         }
 
         $itemType = count($leafTypes) > 0 ? TypeCombinator::union(...$leafTypes) : $arrayType->getItemType();
 
-        return new ArrayType(new IntegerType(), $itemType);
+        // Arrays::flatten() always rebuilds the array via `$result[] = $item`, so the result is always a list
+        return TypeCombinator::intersect(new ArrayType(new IntegerType(), $itemType), new AccessoryArrayListType());
     }
 
     /**
@@ -70,21 +114,34 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
      */
     private function collectLeafTypes(Type $type): array
     {
-        // unwrap `list<T>`, which is represented as an intersection of `array<int, T>` and an accessory list type
-        $arrayType = $type->getArrays()[0] ?? null;
+        // definitely not an array (this also covers pure scalar/object unions, e.g. `int|string`) => single opaque leaf
+        if ($type->isArray()->no()) {
+            return [$type];
+        }
 
-        if ($arrayType instanceof ConstantArrayType) {
-            $valueTypes = $arrayType->getValueTypes();
-        } elseif ($arrayType instanceof ArrayType) {
-            $itemType   = $arrayType->getItemType();
-            $valueTypes = $itemType instanceof UnionType ? $itemType->getTypes() : [$itemType];
-        } else {
+        // a union that *might* be an array (e.g. `string|array{1}`) can't be resolved via `getArrays()`, which
+        // returns an empty result for such "maybe" unions, so split and recurse per member instead
+        if ($type instanceof UnionType) {
+            $leafTypes = [];
+            foreach ($type->getTypes() as $memberType) {
+                array_push($leafTypes, ...$this->collectLeafTypes($memberType));
+            }
+
+            return $leafTypes;
+        }
+
+        $arrayTypes = $this->resolveArrays($type);
+        if ($arrayTypes === null) {
             return [$type];
         }
 
         $leafTypes = [];
-        foreach ($valueTypes as $valueType) {
-            array_push($leafTypes, ...$this->collectLeafTypes($valueType));
+        foreach ($arrayTypes as $arrayType) {
+            $valueTypes = $arrayType instanceof ConstantArrayType ? $arrayType->getValueTypes() : [$arrayType->getItemType()];
+
+            foreach ($valueTypes as $valueType) {
+                array_push($leafTypes, ...$this->collectLeafTypes($valueType));
+            }
         }
 
         return $leafTypes;

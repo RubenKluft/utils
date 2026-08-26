@@ -13,15 +13,9 @@ parameters:
 			path: src/Arrays.php
 
 		-
-			message: '#^Doing instanceof PHPStan\\Type\\ArrayType is error\-prone and deprecated\. Use Type\:\:isArray\(\) or Type\:\:getArrays\(\) instead\.$#'
-			identifier: phpstanApi.instanceofType
-			count: 2
-			path: src/PHPStan/Extension/ArraysFlattenReturnExtension.php
-
-		-
 			message: '#^Doing instanceof PHPStan\\Type\\Constant\\ConstantArrayType is error\-prone and deprecated\. Use Type\:\:getConstantArrays\(\) instead\.$#'
 			identifier: phpstanApi.instanceofType
-			count: 3
+			count: 2
 			path: src/PHPStan/Extension/ArraysFlattenReturnExtension.php
 
 		-

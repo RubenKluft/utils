@@ -552,7 +552,7 @@ class Arrays
      *
      * @param array<array-key, T> $array Array to flatten, values may themselves be nested arrays.
      *
-     * @return array<int, T> The precise item type is resolved by {@see ArraysFlattenReturnExtension}.
+     * @return list<T> The precise item type is resolved by {@see ArraysFlattenReturnExtension}.
      */
     public static function flatten(array $array): array
     {
