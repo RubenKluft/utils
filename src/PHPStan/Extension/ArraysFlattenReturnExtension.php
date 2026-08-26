@@ -39,10 +39,12 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
     {
         [$items] = $methodCall->getArgs();
 
-        $arrayType = $scope->getType($items->value);
+        $inputType = $scope->getType($items->value);
+        // `list<T>` is represented as an intersection of `array<int, T>` and an accessory list type, so unwrap it here.
+        $arrayType = $inputType->getArrays()[0] ?? null;
         // @codeCoverageIgnoreStart
         if ($arrayType instanceof ArrayType === false && $arrayType instanceof ConstantArrayType === false) {
-            return $arrayType;
+            return $inputType;
         }
         // @codeCoverageIgnoreEnd
 
@@ -68,10 +70,13 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
      */
     private function collectLeafTypes(Type $type): array
     {
-        if ($type instanceof ConstantArrayType) {
-            $valueTypes = $type->getValueTypes();
-        } elseif ($type instanceof ArrayType) {
-            $itemType   = $type->getItemType();
+        // unwrap `list<T>`, which is represented as an intersection of `array<int, T>` and an accessory list type
+        $arrayType = $type->getArrays()[0] ?? null;
+
+        if ($arrayType instanceof ConstantArrayType) {
+            $valueTypes = $arrayType->getValueTypes();
+        } elseif ($arrayType instanceof ArrayType) {
+            $itemType   = $arrayType->getItemType();
             $valueTypes = $itemType instanceof UnionType ? $itemType->getTypes() : [$itemType];
         } else {
             return [$type];

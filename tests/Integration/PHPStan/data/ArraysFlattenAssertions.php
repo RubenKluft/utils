@@ -25,7 +25,7 @@ class ArraysFlattenAssertions
         assertType("array{'a', 'b', 'c', 'd'}", Arrays::flatten(['a', ['b', ['c', 'd']]]));
         assertType("array{1, 'a', true, null}", Arrays::flatten([1, ['a', [true, [null]]]]));
 
-        // assert mixed literal/object leafs
+        // assert mixed literal/object leaves
         assertType('array{stdClass, 1}', Arrays::flatten([new stdClass(), [1]]));
 
         // assert dynamic single-level array
@@ -42,5 +42,15 @@ class ArraysFlattenAssertions
         /** @var array<int|string, string|array<int, bool>> $data */
         $data = ['foo', [true, false]];
         assertType('array<int, bool|string>', Arrays::flatten($data));
+
+        // assert dynamic single-level list
+        /** @var list<int> $data */
+        $data = [1, 2, 3];
+        assertType('array<int, int>', Arrays::flatten($data));
+
+        // assert dynamic nested list
+        /** @var list<list<int>> $data */
+        $data = [[1, 2], [3]];
+        assertType('array<int, int>', Arrays::flatten($data));
     }
 }
