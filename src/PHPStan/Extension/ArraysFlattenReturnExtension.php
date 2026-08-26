@@ -22,8 +22,6 @@ use PHPStan\Type\UnionType;
  */
 class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExtension
 {
-    private const MAX_DEPTH = 32;
-
     public function getClass(): string
     {
         return Arrays::class;
@@ -48,7 +46,7 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
         }
         // @codeCoverageIgnoreEnd
 
-        $leafTypes = $this->collectLeafTypes($arrayType, 0);
+        $leafTypes = $this->collectLeafTypes($arrayType);
 
         // literal arrays are flattened into an exact tuple, preserving each leaf's precise type
         if ($arrayType instanceof ConstantArrayType) {
@@ -68,12 +66,8 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
      *
      * @return Type[]
      */
-    private function collectLeafTypes(Type $type, int $depth): array
+    private function collectLeafTypes(Type $type): array
     {
-        if ($depth >= self::MAX_DEPTH) {
-            return [$type];
-        }
-
         if ($type instanceof ConstantArrayType) {
             $valueTypes = $type->getValueTypes();
         } elseif ($type instanceof ArrayType) {
@@ -85,7 +79,7 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
 
         $leafTypes = [];
         foreach ($valueTypes as $valueType) {
-            array_push($leafTypes, ...$this->collectLeafTypes($valueType, $depth + 1));
+            array_push($leafTypes, ...$this->collectLeafTypes($valueType));
         }
 
         return $leafTypes;
