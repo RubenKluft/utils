@@ -15,6 +15,18 @@ parameters:
 		-
 			message: '#^Doing instanceof PHPStan\\Type\\ArrayType is error\-prone and deprecated\. Use Type\:\:isArray\(\) or Type\:\:getArrays\(\) instead\.$#'
 			identifier: phpstanApi.instanceofType
+			count: 2
+			path: src/PHPStan/Extension/ArraysFlattenReturnExtension.php
+
+		-
+			message: '#^Doing instanceof PHPStan\\Type\\Constant\\ConstantArrayType is error\-prone and deprecated\. Use Type\:\:getConstantArrays\(\) instead\.$#'
+			identifier: phpstanApi.instanceofType
+			count: 3
+			path: src/PHPStan/Extension/ArraysFlattenReturnExtension.php
+
+		-
+			message: '#^Doing instanceof PHPStan\\Type\\ArrayType is error\-prone and deprecated\. Use Type\:\:isArray\(\) or Type\:\:getArrays\(\) instead\.$#'
+			identifier: phpstanApi.instanceofType
 			count: 1
 			path: src/PHPStan/Extension/ArraysRemoveTypesReturnExtension.php
 
@@ -55,9 +67,9 @@ parameters:
 			path: src/PHPStan/Extension/ArraysRenameKeyReturnExtension.php
 
 		-
-			message: '#^Using nullsafe property access on non\-nullable type mixed\. Use \-\> instead\.$#'
+			message: '#^Using nullsafe property access on non\-nullable type PhpParser\\Node\\ArrayItem\. Use \-\> instead\.$#'
 			identifier: nullsafe.neverNull
-			count: 1
+			count: 2
 			path: src/PHPStan/Lib/TypeNarrower.php
 
 		-
