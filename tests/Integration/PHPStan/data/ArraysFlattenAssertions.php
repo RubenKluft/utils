@@ -52,6 +52,11 @@ class ArraysFlattenAssertions
         /** @var list<list<int>> $data */
         $data = [[1, 2], [3]];
         assertType('list<int>', Arrays::flatten($data));
+
+        // assert a leaf whose type isn't guaranteed to be array-or-not (e.g. `mixed`) is treated as an opaque leaf
+        /** @var array<int, mixed> $data */
+        $data = [1, 'a'];
+        assertType('list<mixed>', Arrays::flatten($data));
     }
 
     public function assertUnpackedArgument(): void
