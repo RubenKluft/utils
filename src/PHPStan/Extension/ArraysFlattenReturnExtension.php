@@ -91,7 +91,7 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
         $leafTypes = $this->collectLeafTypes($arrayType);
 
         // literal arrays are flattened into an exact tuple, preserving each leaf's precise type
-        if ($arrayType instanceof ConstantArrayType) {
+        if (count($arrayType->getConstantArrays()) === 1) {
             return new ConstantArrayType(
                 array_map(static fn (int $index): ConstantIntegerType => new ConstantIntegerType($index), array_keys($leafTypes)),
                 array_values($leafTypes),
@@ -137,7 +137,8 @@ class ArraysFlattenReturnExtension implements DynamicStaticMethodReturnTypeExten
 
         $leafTypes = [];
         foreach ($arrayTypes as $arrayType) {
-            $valueTypes = $arrayType instanceof ConstantArrayType ? $arrayType->getValueTypes() : [$arrayType->getItemType()];
+            $constantArrays = $arrayType->getConstantArrays();
+            $valueTypes = count($constantArrays) === 1 ? $constantArrays[0]->getValueTypes() : [$arrayType->getItemType()];
 
             foreach ($valueTypes as $valueType) {
                 array_push($leafTypes, ...$this->collectLeafTypes($valueType));
